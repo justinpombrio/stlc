@@ -9,7 +9,7 @@ Definition string_eq (x y: string) : bool :=
 
 Inductive Tipe : Set :=
   | t_bool : Tipe
-  | t_lamb : Tipe -> Tipe -> Tipe.
+  | t_lamb : Tipe -> Tipe -> Tipe. (*arrow may be better term*)
 
 Notation "A :-> B" := (t_lamb A B) (at level 70).
 
@@ -21,7 +21,19 @@ Inductive Term : Set :=
   | lamb  : string -> Term -> Term
   | app   : Term -> Term -> Term.
 
-Inductive Ctx : Set :=
+Definition is_value (t : Term) : Prop :=
+match t with
+  | true => True
+  | false => True
+  | ifte _ _ _ => False
+  | var _ => False
+  | lamb _ _ => True
+  | app _ _ => False
+end.
+
+
+
+Inductive Ctx : Set := (*big gamma*)
   | empty : Ctx
   | cons  : Ctx -> string -> Tipe -> Ctx.
 
@@ -32,7 +44,7 @@ Fixpoint ctx_lookup (G: Ctx) (x: string) : option Tipe :=
       if string_eq x y then Some(A) else ctx_lookup G x
   end.
 
-Inductive Subs : Set :=
+Inductive Subs : Set := (*little gamma*)
   | empty_subs : Subs
   | cons_subs  : Subs -> string -> Term -> Subs.
 
@@ -43,7 +55,7 @@ Fixpoint subs_lookup (g: Subs) (x: string) : option Term :=
       if string_eq x y then Some a else subs_lookup g x
   end.
 
-Fixpoint without (g: Subs) (x: string) : Subs :=
+Fixpoint without (g: Subs) (x: string) : Subs := (*delete a reference in substitution for variable value*)
   match g with
     | empty_subs => empty_subs
     | cons_subs g y a =>
@@ -114,10 +126,26 @@ Inductive Deriv : Judgement -> Prop :=
 
 Notation "# D" := (Deriv D) (at level 70).
 
-Inductive Value : Set :=
-  | v_true  : Value
-  | v_false : Value
-  | v_lamb  : string -> Term -> Value.
+Inductive Step : Term -> Term -> Prop :=
+  | step_search_if : forall a b c a', Step a a' -> Step (ifte a b c) (ifte a' b c)
+  | step_if_true : forall b c, Step (ifte true b c) b
+  | step_if_false : forall b c, Step (ifte false b c) c
+  | search1_app : forall f f' b, Step f f' -> Step (app f b) (app f' b)
+  | search2_app : forall f b b', Step b b' -> is_value f -> Step (app f b) (app f b')
+  | step_app : forall x a b, Step (app (lamb x b) a) (subs1 x a b).
+
+
+Inductive Halts : Term  -> Prop :=
+  | h_true :  Halts true
+  | h_false : Halts false
+  | h_lamb :  forall x b, Halts (lamb x b)
+  | h_step :  forall a b, Step a b -> Halts b -> Halts a.
+
+
+
+
+
+(***Old big step version ***)
   
 Inductive Step : Term -> Term -> Prop :=
   | step_true  : forall a b, Step (ifte true a b) a
