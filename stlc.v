@@ -41,7 +41,7 @@ Fixpoint ctx_lookup (G: Ctx) (x: string) : option Tipe :=
   match G with
     | empty => None
     | cons G y A =>
-      if string_eq x y then Some(A) else ctx_lookup G x
+      if string_eq y x then Some(A) else ctx_lookup G x
   end.
 
 Inductive Subs : Set := (*little gamma*)
@@ -141,9 +141,83 @@ Inductive Halts : Term  -> Prop :=
   | h_lamb :  forall x b, Halts (lamb x b)
   | h_step :  forall a b, Step a b -> Halts b -> Halts a.
 
+Lemma subs1_shadow:
+  forall c x A B G C,
+    #[cons (cons G x A) x B |- c @ C]
+    -> #[cons G x B |- c @ C].
+Proof.
+  intros c. induction c; intros; inversion H; subst.
+  - constructor.
+  - constructor.
+  - apply IHc1 in H3. apply IHc2 in H6. apply IHc3 in H7.
+    constructor; assumption.
+  - inversion H1.
+    destruct (string_eq x s) eqn:eq.
+    { inversion H2; subst.
+      apply d_var. simpl. rewrite eq. reflexivity. }
+    { apply d_var. simpl. rewrite eq. assumption. }
+  - apply d_lamb.
+    
+    
 
 
 
+
+
+  intros. induction c; inversion H; subst.
+  - constructor.
+  - constructor.
+  - intuition. apply IHc1 in H3.
+
+Lemma subs1_lemma:
+  forall x a A,
+    #[empty |- a @ A]
+    -> forall b B, #[cons empty x A |- b @ B]
+                   -> #[empty |- subs1 x a b @ B].
+Proof.
+(*  intros x a A d b. induction b.
+  admit. admit. admit. admit. intros. *)
+  intros x a A d b. induction b; intros; simpl; inversion H; subst.
+  - apply d_true.
+  - apply d_false.
+  - apply IHb1 in H3.
+    apply IHb2 in H6.
+    apply IHb3 in H7.
+    apply d_if; assumption.
+  - inversion H1. destruct (string_eq x s); congruence.
+  - simpl.
+    destruct (string_eq x s) eqn:eq.
+    constructor.
+    
+    
+    admit.
+  - simpl.
+    
+    
+    
+Admitted.
+
+
+
+Theorem type_preservation:
+  forall a a', Step a a' ->
+               forall A, #[empty |- a @ A]
+                         -> #[empty |- a' @ A].
+Proof.
+  intros a a' step.
+  induction step.
+  - intros. inversion H. apply IHstep in H3.
+    apply d_if; assumption.
+  - intros. inversion H. assumption.
+  - intros. inversion H. assumption.
+  - intros. inversion H. subst. apply IHstep in H2.
+    eapply d_app; eassumption.
+  - intros. inversion H0; subst. apply IHstep in H6.
+    eapply d_app; eassumption.
+  - intros. inversion H; clear H; subst.
+    inversion H2; subst.
+    eapply subs1_lemma; eassumption.
+Qed.
 
 (***Old big step version ***)
   
