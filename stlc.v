@@ -193,36 +193,24 @@ Proof.
     { break_value H2.
       { exists consq. apply step_if_true. }
       { exists alt.   apply step_if_false. }
-      { 
-      
-
-
-      elim i; intros; subst.
-      { apply step_if_true. }
-      { simpl.
-      { 
-  - right. econstructor.
-    assert (is_value cond \/ exists a': Term, Step cond a').
-    { eapply IHDeriv1. reflexivity. }
-    inversion H2.
-
-    
-    
-
-
-
-(*
-Lemma halt_if: forall a b c,
-                 Halts a -> Halts b -> Halts c -> Halts (ifte a b c).
-Proof.
-  intros.
-  induction H.
-  - eapply h_step. apply step_if_true. assumption.
-  - eapply h_step. apply step_if_false. assumption.
-  - 
-(*  - simpl. eapply h_step. admit. eassumption. *)
-  - simpl.
-*)
+      { simpl. elim c; intros. elim H2; intros. subst.
+        inversion H. } }
+    { simpl. elim H2; intro cond'; intros.
+      exists (ifte cond' consq alt).
+      constructor; assumption. }
+  - left. apply I.
+  - right.
+    assert (is_value f \/ (exists a': Term, Step f a')).
+    eapply IHDeriv1. reflexivity.
+    destruct H1.
+    { break_value H1.
+      { inversion H. }
+      { inversion H. }
+      { elim c; intros; elim H1; intros; subst.
+        exists (subs1 x a0 x0). constructor. } }
+    { simpl. elim H1; intros f' step.
+      exists (app f' a0). constructor. assumption. }
+Qed.
 
 Fixpoint SN (a: Term) (A: Tipe) : Prop :=
   match A with
@@ -264,6 +252,7 @@ Proof.
   dependent induction H; simpl.
   { split. apply d_true. apply h_true. }
   { split. apply d_false. apply h_false. }
+  { 
   { intuition. destruct A; simpl; split.
     { apply sn__type in H3. apply sn__type in H4.
       apply d_if; try assumption.
@@ -271,6 +260,19 @@ Proof.
       eapply IHDeriv1. reflexivity. assumption. }
     { apply sn__halt in H3. apply sn__halt in H4.
       apply 
+
+
+Lemma halt_if: forall a b c,
+                 Halts a -> Halts b -> Halts c -> Halts (ifte a b c).
+Proof.
+  intros.
+  induction H.
+  - eapply h_step. apply step_if_true. assumption.
+  - eapply h_step. apply step_if_false. assumption.
+  - 
+(*  - simpl. eapply h_step. admit. eassumption. *)
+  - simpl.
+*)
 
 
 
