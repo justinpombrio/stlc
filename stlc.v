@@ -144,7 +144,9 @@ Inductive Step : Term -> Term -> Prop :=
 Hint Constructors Step.
 
 Inductive Halts : Term -> Prop :=
-  | h_halt : forall a, not (exists b, Step a b) -> Halts a
+  | h_true : Halts true
+  | h_false : Halts false
+  | h_lambda : forall x b, Halts (lamb x b)
   | h_step : forall a b, Step a b -> Halts b -> Halts a.
 
 Lemma subs1_lemma:
@@ -262,27 +264,50 @@ Ltac split_sn :=
       simpl; split; try split
   end.
 
+Lemma halts_if: forall a b c B,
+                  Halts a -> Halts b -> Halts c ->
+                  #[ empty |- a @ t_bool] -> 
+                  #[ empty |- b @ B] -> 
+                  #[ empty |- c @ B] ->
+                  Halts (ifte a b c).
+Proof.
+  intros. induction H.
+  - eapply h_step. apply step_if_true. assumption.
+  - eapply h_step. apply step_if_false. assumption.
+  - inversion H2.
+  - apply h_step with (ifte b0 b c).
+    apply step_search_if. assumption.
+    apply IHHalts.
+    eapply type_preservation; eassumption.
+Qed.
+
+
+
 Lemma sn_if: forall a b c B,
                SN a t_bool -> SN b B -> SN c B -> SN (ifte a b c) B.
 Proof.
   intros.
   destruct B; destruct_sn; split_sn.
   - constructor; auto.
+  - eapply halts_if; eauto.
+  - constructor; auto.
+  - eapply halts_if; eauto.
+  - intros.
+Admitted.
+
+
   - simpl. induction H4.
-    { destruct a. apply  h_halt
+    { apply h_halt; intuition.
+      apply H4. elim H5; intros.
+      inversion H6
+    { apply h_halt. intro.
+      elim H5; intros.
+      
+      { 
     { simpl.
     { eapply h_step. apply step_if_true. assumption. }
     { eapply h_step. apply step_if_false. assumption. }
     { 
-
-Lemma halts_if: forall a b c,
-                 Halts a -> Halts b -> Halts c -> Halts (ifte a b c).
-Proof.
-  intros.
-  induction H.
-  - eapply h_step. apply step_if_true. assumption.
-  - eapply h_step. apply step_if_false. assumption.
-Admitted.
 
 Lemma sn_ind: forall g G a A,
                 #[G |- a @ A] -> g |= G -> SN (subs g a) A.
