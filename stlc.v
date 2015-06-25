@@ -141,12 +141,11 @@ Inductive Step : Term -> Term -> Prop :=
   | search2_app : forall f b b', Step b b' -> is_value f -> Step (app f b) (app f b')
   | step_app : forall x a b, Step (app (lamb x b) a) (subs1 x a b).
 
+Hint Constructors Step.
 
 Inductive Halts : Term -> Prop :=
-  | h_true :  Halts true
-  | h_false : Halts false
-  | h_lamb :  forall x b, Halts (lamb x b)
-  | h_step :  forall a b, Step a b -> Halts b -> Halts a.
+  | h_halt : forall a, not (exists b, Step a b) -> Halts a
+  | h_step : forall a b, Step a b -> Halts b -> Halts a.
 
 Lemma subs1_lemma:
   forall x a A,
@@ -231,12 +230,14 @@ Proof.
   { simpl in H; fold SN in H.
     destruct H; destruct H0; assumption. }
 Qed.
+Hint Resolve sn__halt.
 
 Lemma sn__type: forall a A, SN a A -> #[empty |- a @ A].
 Proof.
   intros.
   destruct A; unfold SN in H; destruct H; assumption.
 Qed.
+Hint Resolve sn__type.
 
 Definition subs_matches_ctx (g: Subs) (G: Ctx) : Prop :=
   forall x a A, subs_lookup g x = Some a /\
@@ -245,6 +246,44 @@ Definition subs_matches_ctx (g: Subs) (G: Ctx) : Prop :=
 
 Notation "g |= G" := (subs_matches_ctx g G) (at level 70).
 
+Ltac destruct_sn :=
+  repeat match goal with
+    | [ H : SN _ t_bool |- _ ] =>
+      simpl in H; destruct H
+    | [ H : SN _ (_ :-> _) |- _ ] =>
+      simpl in H; destruct H as (deriv & (halt & imp))
+  end.
+
+Ltac split_sn :=
+  match goal with
+    | [ |- SN _ t_bool ] =>
+      simpl; split
+    | [ |- SN _ (_ :-> _) ] =>
+      simpl; split; try split
+  end.
+
+Lemma sn_if: forall a b c B,
+               SN a t_bool -> SN b B -> SN c B -> SN (ifte a b c) B.
+Proof.
+  intros.
+  destruct B; destruct_sn; split_sn.
+  - constructor; auto.
+  - simpl. induction H4.
+    { destruct a. apply  h_halt
+    { simpl.
+    { eapply h_step. apply step_if_true. assumption. }
+    { eapply h_step. apply step_if_false. assumption. }
+    { 
+
+Lemma halts_if: forall a b c,
+                 Halts a -> Halts b -> Halts c -> Halts (ifte a b c).
+Proof.
+  intros.
+  induction H.
+  - eapply h_step. apply step_if_true. assumption.
+  - eapply h_step. apply step_if_false. assumption.
+Admitted.
+
 Lemma sn_ind: forall g G a A,
                 #[G |- a @ A] -> g |= G -> SN (subs g a) A.
 Proof.
@@ -252,7 +291,22 @@ Proof.
   dependent induction H; simpl.
   { split. apply d_true. apply h_true. }
   { split. apply d_false. apply h_false. }
-  { 
+  { intuition.
+    specialize IHDeriv1 with G cond t_bool.
+    destruct IHDeriv1.
+    { reflexivity. }
+    { assumption. }
+    { destruct A; simpl.
+      { split.
+        { constructor.
+        { constructor; auto. }
+        { apply halts_if; auto.
+      { split; try split.
+        { constructor; auto. }
+        { apply halts_if; auto. }
+        { intros.
+    destruct IHDeriv1.
+    assert (SN (subs g cond) 
   { intuition. destruct A; simpl; split.
     { apply sn__type in H3. apply sn__type in H4.
       apply d_if; try assumption.
@@ -261,18 +315,7 @@ Proof.
     { apply sn__halt in H3. apply sn__halt in H4.
       apply 
 
-
-Lemma halt_if: forall a b c,
-                 Halts a -> Halts b -> Halts c -> Halts (ifte a b c).
-Proof.
-  intros.
-  induction H.
-  - eapply h_step. apply step_if_true. assumption.
-  - eapply h_step. apply step_if_false. assumption.
-  - 
-(*  - simpl. eapply h_step. admit. eassumption. *)
-  - simpl.
-*)
+qqq
 
 
 
