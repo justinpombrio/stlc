@@ -269,19 +269,21 @@ Proof.
 Qed.
 
 Lemma weakening:
-  forall a A, #[empty |- a @ A] -> forall G, #[G |- a @ A].
+  forall a A G, #[empty |- a @ A] -> #[G |- a @ A].
 Proof.
-  intros. generalize dependent A. induction a; intros.
-  - inversion H. constructor.
-  - inversion H. constructor.
-  - inversion H; subst.
-    apply IHa1 in H3. apply IHa2 in H6. apply IHa3 in H7.
-    constructor; assumption.
-  - inversion H; subst. inversion H1.
-  - inversion H; subst.
+  Admitted.
 
-
-
+Lemma if_halts:
+  forall a b c,
+    #[empty |- a @ t_bool] -> Halts a -> Halts b -> Halts c
+    -> Halts (ifte a b c).
+Proof.
+  intros a b c H Ha Hb Hc.
+  induction Ha.
+  - eapply h_step. apply step_if_true. assumption.
+  - eapply h_step. apply step_if_false. assumption.
+  - inversion H.
+  - 
 
 Lemma sn_ind: forall g G a A,
                 #[G |- a @ A] -> g |= G -> SN (subs g a) A.
@@ -292,9 +294,24 @@ Proof.
   { split. apply d_false. apply h_false. }
   { intuition.
     destruct A; simpl.
-    split. destruct_sn.
+    specialize IHDeriv1 with G cond t_bool.
+    split; destruct_sn.
     { constructor.
-
+      destruct IHDeriv1.
+        reflexivity. assumption. assumption. assumption. assumption. }
+    { destruct IHDeriv1.
+        reflexivity. assumption.
+      clear H3 H4 H2 H0 H1.
+      induction H8; subst.
+      { eapply h_step. apply step_if_true. assumption. }
+      { eapply h_step. apply step_if_false. assumption. }
+      { inversion H7. }
+      { eapply type_preservation in H7.
+        apply IHHalts in H7.
+        apply h_step with (ifte b (subs g consq) (subs g alt)).
+        apply step_search_if. assumption. assumption. assumption. } }
+    { split.
+        
 
 
     specialize IHDeriv1 with G cond t_bool.
