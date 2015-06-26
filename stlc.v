@@ -21,22 +21,14 @@ Inductive Term : Set :=
   | lamb  : string -> Term -> Term
   | app   : Term -> Term -> Term.
 
-Definition is_value (t : Term) : Prop :=
-match t with
-  | true | false | lamb _ _      => True
-  | ifte _ _ _ | var _ | app _ _ => False
-end.
+Inductive value : Term -> Prop :=
+  | v_true  : value true
+  | v_false : value false
+  | v_lamb  : forall x b, value (lamb x b).
 
-Lemma value_case:
-  forall t, is_value t -> t = true \/
-                          t = false \/ 
-                          exists x b, t = lamb x b.
-Proof.
-  destruct t; try contradiction; intros.
-  - left; reflexivity.
-  - right; left; reflexivity.
-  - right; right. econstructor; econstructor. reflexivity.
-Qed.
+Record Val :=
+  { t :> Term;
+    v : value t }.
   
 
 
@@ -138,7 +130,7 @@ Inductive Step : Term -> Term -> Prop :=
   | step_if_true : forall b c, Step (ifte true b c) b
   | step_if_false : forall b c, Step (ifte false b c) c
   | search1_app : forall f f' b, Step f f' -> Step (app f b) (app f' b)
-  | search2_app : forall f b b', Step b b' -> is_value f -> Step (app f b) (app f b')
+  | search2_app : forall f b b', Step b b' -> value f -> Step (app f b) (app f b')
   | step_app : forall x a b, Step (app (lamb x b) a) (subs1 x a b).
 
 Hint Constructors Step.
@@ -176,39 +168,34 @@ Proof.
     eapply subs1_lemma; eassumption.
 Qed.
 
-Ltac break_value H :=
-  (apply value_case in H; destruct H as [ a | [ b | c ] ]; intros; subst).
-
 Theorem type_progress:
   forall a A,
-    #[empty |- a @ A] -> is_value a \/ exists a', Step a a'.
+    #[empty |- a @ A] -> value a \/ exists a', Step a a'.
 Proof.
   intros. dependent induction H.
-  - left. apply I.
-  - left. apply I.
+  - left. constructor.
+  - left. constructor.
   - right.
+    assert (value cond \/ exists a': Term, Step cond a').
     specialize IHDeriv1 with cond t_bool.
-    assert (is_value cond \/ exists a': Term, Step cond a').
     apply IHDeriv1. reflexivity.
     destruct H2.
-    { break_value H2.
+    { inversion H2; subst.
       { exists consq. apply step_if_true. }
       { exists alt.   apply step_if_false. }
-      { simpl. elim c; intros. elim H2; intros. subst.
-        inversion H. } }
-    { simpl. elim H2; intro cond'; intros.
+      { inversion H. } }
+    { elim H2; intro cond'; intros.
       exists (ifte cond' consq alt).
       constructor; assumption. }
-  - left. apply I.
+  - left. constructor.
   - right.
-    assert (is_value f \/ (exists a': Term, Step f a')).
+    assert (value f \/ (exists a': Term, Step f a')).
     eapply IHDeriv1. reflexivity.
     destruct H1.
-    { break_value H1.
+    { inversion H1; subst.
       { inversion H. }
       { inversion H. }
-      { elim c; intros; elim H1; intros; subst.
-        exists (subs1 x a0 x0). constructor. } }
+      { exists (subs1 x a0 b). constructor. } }
     { simpl. elim H1; intros f' step.
       exists (app f' a0). constructor. assumption. }
 Qed.
@@ -281,7 +268,56 @@ Proof.
     eapply type_preservation; eassumption.
 Qed.
 
+Lemma weakening:
+  forall a A, #[empty |- a @ A] -> forall G, #[G |- a @ A].
+Proof.
+  intros. generalize dependent A. induction a; intros.
+  - inversion H. constructor.
+  - inversion H. constructor.
+  - inversion H; subst.
+    apply IHa1 in H3. apply IHa2 in H6. apply IHa3 in H7.
+    constructor; assumption.
+  - inversion H; subst. inversion H1.
+  - inversion H; subst.
 
+
+
+
+Lemma sn_ind: forall g G a A,
+                #[G |- a @ A] -> g |= G -> SN (subs g a) A.
+Proof.
+  intros.
+  dependent induction H; destruct_sn; simpl.
+  { split. apply d_true. apply h_true. }
+  { split. apply d_false. apply h_false. }
+  { intuition.
+    destruct A; simpl.
+    split. destruct_sn.
+    { constructor.
+
+
+
+    specialize IHDeriv1 with G cond t_bool.
+    destruct IHDeriv1.
+    { reflexivity. }
+    { assumption. }
+    { destruct A; simpl.
+      { split.
+        { constructor; auto. }
+        { eapply halts_if; eauto. } }
+      { split; try split.
+        { constructor; auto. }
+        { eapply halts_if; eauto. }
+        { intros. subst.
+    destruct IHDeriv1.
+    assert (SN (subs g cond) 
+  { intuition. destruct A; simpl; split.
+    { apply sn__type in H3. apply sn__type in H4.
+      apply d_if; try assumption.
+      apply sn__type.
+      eapply IHDeriv1. reflexivity. assumption. }
+    { apply sn__halt in H3. apply sn__halt in H4.
+      apply 
 
 Lemma sn_if: forall a b c B,
                SN a t_bool -> SN b B -> SN c B -> SN (ifte a b c) B.
@@ -293,54 +329,6 @@ Proof.
   - constructor; auto.
   - eapply halts_if; eauto.
   - intros.
-Admitted.
-
-
-  - simpl. induction H4.
-    { apply h_halt; intuition.
-      apply H4. elim H5; intros.
-      inversion H6
-    { apply h_halt. intro.
-      elim H5; intros.
-      
-      { 
-    { simpl.
-    { eapply h_step. apply step_if_true. assumption. }
-    { eapply h_step. apply step_if_false. assumption. }
-    { 
-
-Lemma sn_ind: forall g G a A,
-                #[G |- a @ A] -> g |= G -> SN (subs g a) A.
-Proof.
-  intros.
-  dependent induction H; simpl.
-  { split. apply d_true. apply h_true. }
-  { split. apply d_false. apply h_false. }
-  { intuition.
-    specialize IHDeriv1 with G cond t_bool.
-    destruct IHDeriv1.
-    { reflexivity. }
-    { assumption. }
-    { destruct A; simpl.
-      { split.
-        { constructor.
-        { constructor; auto. }
-        { apply halts_if; auto.
-      { split; try split.
-        { constructor; auto. }
-        { apply halts_if; auto. }
-        { intros.
-    destruct IHDeriv1.
-    assert (SN (subs g cond) 
-  { intuition. destruct A; simpl; split.
-    { apply sn__type in H3. apply sn__type in H4.
-      apply d_if; try assumption.
-      apply sn__type.
-      eapply IHDeriv1. reflexivity. assumption. }
-    { apply sn__halt in H3. apply sn__halt in H4.
-      apply 
-
-qqq
 
 
 
